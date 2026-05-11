@@ -1,0 +1,2463 @@
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #1 — HIGH (200 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: add batch create_schedules function for multiple beneficiaries
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Currently the contract only supports creating one vesting schedule at a time. For teams doing token launches, it's common to vest tokens for 10–50 team members at once.
+
+## Task
+Add a `create_schedules_batch` function that accepts a vector of schedule parameters and creates all of them in a single transaction.
+
+## Requirements
+- Accept a `Vec` of schedule params (beneficiary, start_time, cliff, duration, amount, revocable)
+- Validate all entries before processing any (all-or-nothing)
+- Transfer the total token amount in one operation
+- Emit a `CREATED` event for each schedule
+- Write unit tests covering: happy path, partial invalid input, duplicate beneficiary in batch
+
+## Acceptance Criteria
+- [ ] Function compiles and passes all tests
+- [ ] Handles up to 20 beneficiaries per batch
+- [ ] PR includes updated `CONTRACT.md` docs
+
+**Complexity:** High | **Points:** 200
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #2 — HIGH (200 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: support periodic unlock intervals (e.g. monthly, quarterly)
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+The current linear vesting releases tokens continuously. Some use cases require discrete periodic unlocks — e.g. unlock 25% every quarter rather than a smooth curve.
+
+## Task
+Add an optional `unlock_interval` parameter to `create_schedule`. When set, tokens unlock in discrete chunks at each interval boundary rather than continuously.
+
+## Requirements
+- New optional field `unlock_interval: Option<u64>` (seconds between unlocks)
+- When `None`, behaves as current linear vesting
+- When `Some(interval)`, tokens unlock in equal chunks at each interval
+- Update `calculate_vested` in `vesting.rs` to handle both modes
+- Write tests for quarterly, monthly, and annual unlock intervals
+
+## Acceptance Criteria
+- [ ] Both vesting modes work correctly
+- [ ] Existing tests still pass
+- [ ] New tests cover interval edge cases
+
+**Complexity:** High | **Points:** 200
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #3 — HIGH (200 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: build owner admin dashboard with all schedules overview
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+The current dashboard shows a user their own schedule. Owners need a dedicated admin view to manage all schedules across all beneficiaries.
+
+## Task
+Create a new `/admin` route in the frontend with a full admin dashboard.
+
+## Requirements
+- List all beneficiaries with their schedule status (active, fully vested, revoked)
+- Show aggregate stats: total tokens locked, total claimed, total unvested
+- Allow owner to revoke any revocable schedule from the UI
+- Allow owner to create new schedules from the UI
+- Protect the route — only show if connected wallet matches owner address
+
+## Acceptance Criteria
+- [ ] Admin page renders correctly
+- [ ] Revoke action calls contract and refreshes data
+- [ ] Aggregate stats are calculated correctly
+- [ ] Route is hidden for non-owners
+
+**Complexity:** High | **Points:** 200
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #4 — HIGH (200 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: implement token approval step in create schedule flow
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Before the owner can create a vesting schedule, they must approve the contract to spend their tokens. Currently this step is not handled in the frontend — users get a confusing error.
+
+## Task
+Add an approval step to the `CreateScheduleForm` flow that checks the current allowance and prompts the user to approve if needed.
+
+## Requirements
+- Check current token allowance for the contract before submitting
+- If allowance is insufficient, show an "Approve Tokens" button first
+- After approval transaction confirms, automatically proceed to create schedule
+- Show clear status messages: "Approving...", "Approved ✓", "Creating schedule..."
+- Handle approval errors gracefully
+
+## Acceptance Criteria
+- [ ] Two-step flow works end-to-end on testnet
+- [ ] UI clearly communicates each step
+- [ ] No duplicate approval if allowance is already sufficient
+
+**Complexity:** High | **Points:** 200
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #5 — MEDIUM (150 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: add get_vesting_summary contract function
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Add a read-only contract function that returns aggregate statistics across all vesting schedules.
+
+## Task
+Implement `get_vesting_summary()` returning:
+- `total_schedules: u32`
+- `active_schedules: u32`
+- `revoked_schedules: u32`
+- `total_tokens_locked: i128`
+- `total_tokens_claimed: i128`
+- `total_tokens_vested: i128`
+
+## Requirements
+- Iterate over all beneficiaries and aggregate stats
+- Write unit tests with multiple schedules in different states
+
+## Acceptance Criteria
+- [ ] Function returns correct values
+- [ ] Tests cover: all active, mix of revoked/active, all claimed
+
+**Complexity:** Medium | **Points:** 150
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #6 — MEDIUM (150 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: add vesting milestone notification banners
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Users should be notified when they reach key vesting milestones: cliff reached, 50% vested, fully vested.
+
+## Task
+Add a notification system that shows banners when the user's schedule hits a milestone.
+
+## Requirements
+- Check milestones on page load and after each claim
+- Show dismissible banner for: cliff reached, 50% vested, 100% vested
+- Store dismissed state in `localStorage` so banners don't reappear
+- Use existing CSS variables for styling (no new dependencies)
+
+## Acceptance Criteria
+- [ ] Banners appear at correct milestones
+- [ ] Dismissed banners don't reappear on refresh
+- [ ] Works correctly when no schedule exists
+
+**Complexity:** Medium | **Points:** 150
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #7 — MEDIUM (150 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: add dark/light theme toggle to navbar
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+The app currently only supports dark mode. Add a theme toggle so users can switch to light mode.
+
+## Task
+Implement a theme toggle button in the navbar that switches between dark and light CSS themes.
+
+## Requirements
+- Add light theme CSS variables to `global.css`
+- Toggle button in the navbar (moon/sun icon)
+- Persist preference in `localStorage`
+- Apply theme class to `<html>` element
+- All existing components must look correct in both themes
+
+## Acceptance Criteria
+- [ ] Toggle works without page reload
+- [ ] Preference persists across sessions
+- [ ] No hardcoded colors remain — all use CSS variables
+
+**Complexity:** Medium | **Points:** 150
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #8 — MEDIUM (150 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: test: add full lifecycle integration test
+
+Labels: Stellar Wave, testing, medium complexity
+
+Description:
+## Summary
+There is no test that covers the complete lifecycle of a vesting schedule from creation through to full claim or revocation.
+
+## Task
+Write a comprehensive integration test in `contract/src/tests.rs` covering the full lifecycle.
+
+## Requirements
+Test should cover:
+1. Initialize contract
+2. Create a revocable schedule
+3. Assert nothing claimable during cliff
+4. Claim at cliff
+5. Assert remaining claimable at 6 months
+6. Revoke at 9 months
+7. Assert unvested returned to owner
+8. Assert beneficiary can still claim vested portion
+
+## Acceptance Criteria
+- [ ] Test passes with `cargo test`
+- [ ] Each step has a clear comment
+- [ ] No use of `unwrap()` without explanation
+
+**Complexity:** Medium | **Points:** 150
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #9 — MEDIUM (150 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: add CSV export button for all vesting schedules
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Owners need to export vesting data for accounting and reporting purposes.
+
+## Task
+Add an "Export CSV" button that downloads all vesting schedules as a CSV file.
+
+## Requirements
+- Columns: Beneficiary, Start Date, Cliff Date, End Date, Total Amount, Vested Amount, Claimed Amount, Status
+- Use browser's native download (no server required)
+- Format dates as `YYYY-MM-DD`
+- Button only visible to owner
+
+## Acceptance Criteria
+- [ ] CSV downloads correctly in Chrome and Firefox
+- [ ] All columns present and correctly formatted
+- [ ] Empty state handled
+
+**Complexity:** Medium | **Points:** 150
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #10 — TRIVIAL (100 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: fix: improve Stellar address validation in CreateScheduleForm
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+The current address validation uses a basic regex. It should use the Stellar SDK checksum validation instead.
+
+## Task
+Replace the regex check in `CreateScheduleForm.tsx` with `StrKey.isValidEd25519PublicKey()` from `@stellar/stellar-sdk`.
+
+## Acceptance Criteria
+- [ ] Invalid addresses show a clear error message
+- [ ] Valid addresses pass without error
+- [ ] No new dependencies added
+
+**Complexity:** Trivial | **Points:** 100
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #11 — TRIVIAL (100 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: add skeleton loading state to VestingCard
+
+Labels: Stellar Wave, enhancement, trivial
+
+Description:
+## Summary
+When the dashboard loads, there is a plain "Loading..." text. Replace it with a skeleton UI.
+
+## Task
+Create a `VestingCardSkeleton` component that renders a pulsing placeholder.
+
+## Requirements
+- Use CSS animation (`@keyframes pulse`) — no new libraries
+- Match the card layout: header, stats grid, progress bar, timeline
+- Show 2 skeleton cards while loading
+
+## Acceptance Criteria
+- [ ] Skeleton renders during loading state
+- [ ] Animation is smooth
+- [ ] Removed once data loads
+
+**Complexity:** Trivial | **Points:** 100
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #12 — TRIVIAL (100 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: feat: add copy-to-clipboard for addresses in the UI
+
+Labels: Stellar Wave, enhancement, trivial
+
+Description:
+## Summary
+Long Stellar addresses are hard to copy manually. Add a copy button next to all displayed addresses.
+
+## Task
+Create a reusable `CopyButton` component that copies text to clipboard and shows a "Copied!" confirmation.
+
+## Requirements
+- Use `navigator.clipboard.writeText()`
+- Show "Copied!" for 2 seconds then revert to copy icon
+- Add to: beneficiary address in VestingCard, contract ID in footer
+
+## Acceptance Criteria
+- [ ] Works in Chrome and Firefox
+- [ ] Confirmation message disappears after 2 seconds
+- [ ] Accessible (keyboard focusable, aria-label)
+
+**Complexity:** Trivial | **Points:** 100
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #13 — TRIVIAL (100 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: docs: add mainnet deployment guide
+
+Labels: Stellar Wave, documentation, trivial
+
+Description:
+## Summary
+`DEPLOYMENT.md` only covers testnet. Add a section for deploying to Stellar Mainnet.
+
+## Task
+Add a "Deploy to Mainnet" section to `docs/DEPLOYMENT.md` covering:
+- Network passphrase for mainnet
+- Funding the deployer account with real XLM
+- Changing environment variables
+- Security checklist before mainnet deploy
+
+## Acceptance Criteria
+- [ ] Guide is accurate and complete
+- [ ] Security checklist has at least 5 items
+- [ ] Links to Stellar Mainnet explorer
+
+**Complexity:** Trivial | **Points:** 100
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #14 — TRIVIAL (100 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: chore: configure TypeScript path aliases in frontend
+
+Labels: Stellar Wave, chore, trivial
+
+Description:
+## Summary
+Frontend imports use relative paths like `../../services/contract`. Configure `@/` path alias.
+
+## Task
+Update `tsconfig.json` and `vite.config.ts` to support `@/` as an alias for `src/`. Then update all existing imports.
+
+## Acceptance Criteria
+- [ ] `@/` alias works in all `.tsx` and `.ts` files
+- [ ] `npm run build` passes without errors
+- [ ] All relative `../../` imports replaced
+
+**Complexity:** Trivial | **Points:** 100
+
+═══════════════════════════════════════════════════════════════════════════════
+ISSUE #15 — TRIVIAL (100 points)
+═══════════════════════════════════════════════════════════════════════════════
+
+Title: ci: add GitHub Actions workflow to run Soroban contract tests
+
+Labels: Stellar Wave, ci, trivial
+
+Description:
+## Summary
+There is no CI pipeline. Add a GitHub Actions workflow that runs `cargo test` on every push and pull request.
+
+## Task
+Create `.github/workflows/contract-tests.yml` that:
+- Triggers on push to `main`/`master` and all pull requests
+- Sets up Rust with the `wasm32-unknown-unknown` target
+- Runs `cargo test` in the `contract/` directory
+- Caches the Cargo registry for faster runs
+
+## Acceptance Criteria
+- [ ] Workflow file is valid YAML
+- [ ] Tests run successfully in CI
+- [ ] Cache step reduces subsequent run times
+
+**Complexity:** Trivial | **Points:** 100
+
+═══════════════════════════════════════════════════════════════════════════════
+END — Total: 15 issues, 2,200 points
+═══════════════════════════════════════════════════════════════════════════════
+
+
+-------------------------------------------------------------------------------
+ISSUE #16 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add pause/unpause mechanism to freeze all claims
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+In emergency situations (e.g. token exploit, legal hold), the owner needs to halt all claims without revoking individual schedules.
+
+## Task
+Add pause and unpause functions to the contract. When paused, claim returns a new ContractPaused error.
+
+## Requirements
+- Add Paused key to DataKey enum in storage.rs`n- pause(env) and unpause(env) � owner-only
+- claim checks paused state before processing
+- Emit PAUSED / UNPAUSED events via events.rs`n- Add ContractPaused = 13 to VestingError`n- Unit tests: claim while paused fails, claim after unpause succeeds
+
+## Acceptance Criteria
+- [ ] Pause/unpause compile and pass tests
+- [ ] Existing tests unaffected
+- [ ] Events emitted correctly
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #17 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: implement multi-token vesting support
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+The contract is initialized with a single token address. Some projects need to vest multiple token types (e.g. governance token + utility token) from the same contract.
+
+## Task
+Refactor the contract so each schedule stores its own 	oken address instead of relying on a single global token.
+
+## Requirements
+- Add 	oken: Address field to VestingSchedule in 	ypes.rs`n- Update create_schedule to accept a 	oken parameter
+- Update claim and evoke to use schedule.token for transfers
+- Keep backward-compatible get_token() returning the default token
+- Update all tests
+
+## Acceptance Criteria
+- [ ] Two schedules with different tokens can coexist
+- [ ] All existing tests pass
+- [ ] New test covers dual-token scenario
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #18 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add schedule amendment function (extend duration or increase amount)
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Once a schedule is created there is no way to modify it. Owners sometimes need to extend a vesting period or top-up the token amount for a beneficiary.
+
+## Task
+Add an mend_schedule function that allows the owner to extend 	otal_duration or increase 	otal_amount for an existing non-revoked schedule.
+
+## Requirements
+- Owner-only, requires auth
+- Can only increase 	otal_amount (never decrease)
+- Can only extend 	otal_duration (never shorten)
+- Transfer additional tokens from owner when amount increases
+- Emit AMENDED event
+- Tests: extend duration, increase amount, attempt to decrease (should fail)
+
+## Acceptance Criteria
+- [ ] Amendment compiles and passes tests
+- [ ] Decreasing values returns InvalidParameters error
+- [ ] Event emitted with old and new values
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #19 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: build a vesting schedule NFT receipt on Stellar
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+When a vesting schedule is created, mint a non-transferable Stellar NFT to the beneficiary as a receipt. This gives beneficiaries on-chain proof of their vesting rights.
+
+## Task
+After create_schedule succeeds, invoke a companion SEP-0011 NFT contract to mint a receipt token to the beneficiary.
+
+## Requirements
+- Deploy a minimal NFT contract alongside the vesting contract
+- Mint on schedule creation, burn on full claim or revocation
+- NFT metadata: beneficiary, total_amount, cliff_duration, total_duration
+- Frontend: display NFT badge on VestingCard when receipt exists
+- Tests for mint, burn on claim, burn on revoke
+
+## Acceptance Criteria
+- [ ] NFT minted on testnet after schedule creation
+- [ ] NFT burned after full claim
+- [ ] Frontend badge visible
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #20 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add on-chain vesting schedule transfer (beneficiary change)
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Beneficiaries may need to transfer their vesting rights to a new address (e.g. wallet migration). Add a 	ransfer_schedule function.
+
+## Task
+Implement 	ransfer_schedule(env, old_beneficiary, new_beneficiary) that moves the schedule to a new address.
+
+## Requirements
+- Requires auth from both old_beneficiary and owner
+- 
+ew_beneficiary must not already have a schedule
+- Update beneficiary list in storage
+- Emit TRANSFERRED event
+- Tests: successful transfer, transfer to existing beneficiary fails
+
+## Acceptance Criteria
+- [ ] Schedule accessible under new address after transfer
+- [ ] Old address no longer has a schedule
+- [ ] Dual-auth enforced
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #21 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: implement accelerated vesting on milestone trigger
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Some vesting agreements include acceleration clauses � e.g. all tokens vest immediately upon acquisition. Add an ccelerate function that fully vests a schedule instantly.
+
+## Task
+Add ccelerate(env, beneficiary) � owner-only � that sets 	otal_duration to elapsed time, making all tokens immediately claimable.
+
+## Requirements
+- Owner-only with auth
+- Schedule must not be revoked
+- Update 	otal_duration to current_time - start_time in storage
+- Emit ACCELERATED event
+- Tests: accelerate at 6 months, verify 100% claimable
+
+## Acceptance Criteria
+- [ ] After acceleration, calculate_vested returns 	otal_amount`n- [ ] Beneficiary can claim full amount immediately
+- [ ] Event emitted
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #22 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add co-signer / approver role for schedule creation
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Large organisations require a second approver before a vesting schedule goes live. Add a two-of-two multisig flow at the contract level.
+
+## Task
+Add an optional pprover address to the contract. When set, create_schedule requires both owner and approver signatures.
+
+## Requirements
+- set_approver(env, approver) � owner-only
+- emove_approver(env) � owner-only
+- When approver is set, create_schedule calls pprover.require_auth()  
+- Store approver in DataKey::Approver`n- Tests: create with approver set, create without approver set
+
+## Acceptance Criteria
+- [ ] Schedule creation blocked without approver signature when approver is set
+- [ ] Works normally when no approver configured
+- [ ] Approver can be changed by owner
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #23 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add get_claimable_at query function
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Users want to know how many tokens will be claimable at a future date without waiting. Add a read-only query that accepts a future timestamp.
+
+## Task
+Add get_claimable_at(env, beneficiary, timestamp) that returns the claimable amount at any given timestamp.
+
+## Requirements
+- Read-only (no state changes)
+- Reuse calculate_vested from esting.rs`n- Return   if schedule is revoked
+- Tests: past timestamp, current timestamp, future timestamp
+
+## Acceptance Criteria
+- [ ] Returns correct values for all time ranges
+- [ ] Does not modify state
+- [ ] Frontend can call it for the vesting chart projection
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #24 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add storage TTL extension for persistent schedule entries
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Soroban persistent storage entries expire after a TTL. Long-running vesting schedules (e.g. 4-year) risk expiry. Add automatic TTL bumping.
+
+## Task
+In set_schedule and get_schedule in storage.rs, call env.storage().persistent().extend_ttl() to keep entries alive for the full vesting duration.
+
+## Requirements
+- Calculate required TTL from 	otal_duration at schedule creation
+- Bump TTL on every claim call as well
+- Add a public extend_schedule_ttl(env, beneficiary) function anyone can call
+- Tests verify TTL is set correctly
+
+## Acceptance Criteria
+- [ ] Schedules with 4-year duration have appropriate TTL
+- [ ] extend_schedule_ttl callable by anyone
+- [ ] Tests pass
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #25 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add partial claim amount parameter to claim function
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+The current claim function always claims the full claimable amount. Some beneficiaries want to claim only a portion (e.g. for tax planning).
+
+## Task
+Add an optional mount: Option<i128> parameter to claim. When Some(n), claim exactly 
+ tokens (if available). When None, claim all.
+
+## Requirements
+- Validate mount <= claimable; return InvalidAmount if not
+- Update claimed_amount by the actual claimed value
+- Tests: partial claim, full claim via None, over-claim attempt
+
+## Acceptance Criteria
+- [ ] Partial claim transfers correct amount
+- [ ] Over-claim returns error
+- [ ] Existing tests still pass with None  
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #26 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: test: add fuzz tests for calculate_vested edge cases
+
+Labels: Stellar Wave, testing, medium complexity
+
+Description:
+## Summary
+calculate_vested in esting.rs handles arithmetic that could overflow or produce unexpected results with extreme inputs. Add property-based fuzz tests.
+
+## Task
+Using the proptest crate, write fuzz tests for calculate_vested covering random combinations of start_time, cliff_duration, 	otal_duration, 	otal_amount, and current_time.
+
+## Requirements
+- Add proptest as a dev-dependency in Cargo.toml`n- Properties to verify: result is always >= 0, result is always <= total_amount, result is   before cliff
+- At least 3 property tests
+
+## Acceptance Criteria
+- [ ] cargo test passes with proptest
+- [ ] No panics on any input combination
+- [ ] Properties documented with comments
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #27 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add wallet disconnect button and session cleanup
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Once connected, there is no way to disconnect the wallet from the UI. The walletStore.ts has no disconnect action.
+
+## Task
+Add a disconnect() action to walletStore.ts and a disconnect button to the WalletButton component.
+
+## Requirements
+- disconnect() clears ddress, 
+etwork, sets isConnected: false  
+- Calls Freighter's disconnect API if available
+- WalletButton shows address + disconnect icon when connected
+- Clicking disconnect shows a confirmation tooltip before disconnecting
+- Dashboard resets to the disconnected empty state
+
+## Acceptance Criteria
+- [ ] Disconnect clears all wallet state
+- [ ] Dashboard shows connect prompt after disconnect
+- [ ] No stale data visible after disconnect
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #28 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add transaction history panel to Dashboard
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Users have no way to see past claim transactions. Add a transaction history panel that lists all CLAIMED events for the connected wallet.
+
+## Task
+Query the Stellar RPC for contract events filtered by CLAIMED topic and the connected wallet address, then display them in a table.
+
+## Requirements
+- New getClaimHistory(config, beneficiary) function in contract.ts`n- Uses server.getEvents() with topic filter
+- Display: date, amount, transaction hash (linked to Stellar Expert)
+- Show last 20 transactions
+- Empty state when no history
+
+## Acceptance Criteria
+- [ ] History loads on dashboard mount
+- [ ] Transaction hash links to correct explorer URL
+- [ ] Empty state handled gracefully
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #29 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add real-time claimable amount counter to VestingCard
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+The claimable amount shown in VestingCard is a snapshot from the last fetch. For linear vesting, tokens accrue every second � show a live ticking counter.
+
+## Task
+Add a useLiveClaimable hook that recalculates claimable amount client-side every second using the schedule parameters, without hitting the RPC.
+
+## Requirements
+- Hook accepts VestingSchedule and returns a live igint claimable value
+- Uses setInterval with 1-second tick
+- Cleans up interval on unmount
+- VestingCard uses this hook for the Claimable stat
+- No new dependencies
+
+## Acceptance Criteria
+- [ ] Counter increments visibly for active schedules
+- [ ] Stops at 	otal_amount - claimed_amount`n- [ ] No memory leaks (interval cleared on unmount)
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #30 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add toast notification system for transaction feedback
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+After claim/revoke/create actions, there is no user feedback beyond the button re-enabling. Add a toast notification system.
+
+## Task
+Create a ToastProvider and useToast hook. Show success/error toasts after every contract interaction.
+
+## Requirements
+- Toasts appear in bottom-right corner
+- Auto-dismiss after 4 seconds
+- Types: success (green), error (red), info (blue)
+- Use existing CSS variables � no new libraries
+- Dashboard calls 	oast.success('Claimed X tokens') after successful claim
+- Dashboard calls 	oast.error(err.message) on failure
+
+## Acceptance Criteria
+- [ ] Toasts appear and auto-dismiss
+- [ ] Multiple toasts stack correctly
+- [ ] Accessible (role=alert, aria-live)
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #31 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add network switcher (testnet/mainnet) to frontend
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+The frontend is hardcoded to testnet. Add a network switcher so users can toggle between testnet and mainnet without changing env vars.
+
+## Task
+Add a network selector dropdown to the navbar that updates DEFAULT_CONFIG at runtime.
+
+## Requirements
+- Dropdown with Testnet / Mainnet options
+- Updates 
+etworkPassphrase and pcUrl in config
+- Persists selection in localStorage`n- Shows a warning banner when mainnet is selected
+- Reloads dashboard data on network switch
+
+## Acceptance Criteria
+- [ ] Switching network reloads schedules
+- [ ] Warning banner visible on mainnet
+- [ ] Selection persists on page refresh
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #32 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add search and filter to All Schedules owner view
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+When there are many schedules, the owner needs to search by beneficiary address and filter by status (active, revoked, fully vested).
+
+## Task
+Add a search input and status filter above the schedules grid in Dashboard.tsx.
+
+## Requirements
+- Search filters llInfos by partial beneficiary address match
+- Status filter: All / Active / Revoked / Fully Vested
+- Filtering is client-side (no new RPC calls)
+- Result count shown: 'Showing 3 of 12 schedules'
+- Filters reset when new schedule is created
+
+## Acceptance Criteria
+- [ ] Search works case-insensitively
+- [ ] Status filter correctly categorises schedules
+- [ ] Count label updates correctly
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #33 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add countdown timer to cliff and end date in VestingCard
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Beneficiaries want to know exactly how long until their cliff or vesting end. Add live countdown timers to the timeline section of VestingCard.
+
+## Task
+Create a useCountdown(targetTimestamp) hook and use it in the timeline section of VestingCard.tsx.
+
+## Requirements
+- Shows 'X days Y hours Z mins' until cliff (if not yet reached)
+- Shows 'Cliff reached' once past cliff
+- Shows 'X days until fully vested' until end
+- Shows 'Fully vested' once past end date
+- Updates every minute
+
+## Acceptance Criteria
+- [ ] Countdown accurate to the minute
+- [ ] Correct labels for past/future states
+- [ ] No memory leaks
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #34 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add email notification opt-in for vesting milestones
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Beneficiaries want email reminders when their cliff is reached or when they're fully vested. Add an opt-in email notification form.
+
+## Task
+Add a settings panel where users can enter their email and subscribe to milestone notifications. Use a simple backend webhook or third-party service like SendGrid.
+
+## Requirements
+- Settings panel in Dashboard with email input
+- Store email + beneficiary address in a simple backend DB or Firebase
+- Backend cron job checks schedules daily and sends emails at milestones
+- Unsubscribe link in every email
+- Privacy notice: 'Email only used for vesting notifications'
+
+## Acceptance Criteria
+- [ ] Email sent when cliff reached (testnet)
+- [ ] Email sent when fully vested
+- [ ] Unsubscribe works
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #35 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: test: add contract integration tests using soroban-sdk testutils
+
+Labels: Stellar Wave, testing, medium complexity
+
+Description:
+## Summary
+	ests.rs currently has minimal coverage. Add full integration tests for create_schedule, claim, evoke, and 	ransfer_ownership using the Soroban test environment.
+
+## Task
+Expand contract/src/tests.rs with integration tests that deploy the contract, register a token, and exercise all public functions.
+
+## Requirements
+- Use soroban_sdk::testutils for mock env and addresses
+- Test: initialize twice fails
+- Test: create schedule, claim at 6 months, claim again (nothing left)
+- Test: revoke returns correct unvested amount
+- Test: transfer_ownership, old owner can no longer create schedules
+- Each test is independent (fresh env)
+
+## Acceptance Criteria
+- [ ] All tests pass with cargo test`n- [ ] No unwrap() without comment
+- [ ] Coverage of all error variants
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #36 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add shareable vesting schedule link
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Owners want to share a read-only view of a beneficiary's vesting schedule via a URL. Add a shareable link feature.
+
+## Task
+Add a /schedule/:beneficiary route that shows a read-only VestingCard for any address, no wallet connection required.
+
+## Requirements
+- New route /schedule/:beneficiary in App.tsx`n- Fetches getVestingInfo for the address in the URL
+- Shows VestingCard in read-only mode (no claim/revoke buttons)
+- 'Share' button on VestingCard copies the URL to clipboard
+- 404-style message if no schedule found
+
+## Acceptance Criteria
+- [ ] Route works without wallet connection
+- [ ] Share button copies correct URL
+- [ ] Read-only: no action buttons visible
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #37 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add mobile-responsive layout to Dashboard
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+The dashboard layout breaks on screens narrower than 768px. The stats grid and timeline overflow horizontally.
+
+## Task
+Update global.css to make the dashboard fully responsive down to 375px (iPhone SE).
+
+## Requirements
+- Stats grid: 2-column on mobile, 4-column on desktop
+- VestingCard timeline: stacks vertically on mobile
+- CreateScheduleForm: full-width inputs on mobile
+- Navbar: hamburger menu on mobile
+- No new CSS frameworks � use existing CSS variables and media queries
+
+## Acceptance Criteria
+- [ ] No horizontal scroll on 375px viewport
+- [ ] All interactive elements reachable on mobile
+- [ ] Tested in Chrome DevTools mobile emulation
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #38 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add error boundary component to Dashboard
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+If any component throws an unhandled error, the entire app crashes with a blank screen. Add a React error boundary.
+
+## Task
+Create an ErrorBoundary class component that catches render errors and shows a friendly fallback UI.
+
+## Requirements
+- Wraps the entire Dashboard and each VestingCard`n- Fallback UI: 'Something went wrong. Try refreshing.' with a retry button
+- Logs error details to console
+- Does not crash the whole app when one VestingCard fails
+
+## Acceptance Criteria
+- [ ] Single card error does not crash other cards
+- [ ] Retry button resets the error boundary
+- [ ] Error message is user-friendly
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #39 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: docs: write CONTRIBUTING.md guide for contract contributors
+
+Labels: Stellar Wave, documentation, medium complexity
+
+Description:
+## Summary
+docs/CONTRIBUTING.md exists but is empty. Write a full contributor guide for the Soroban contract.
+
+## Task
+Fill in docs/CONTRIBUTING.md with a complete guide covering setup, testing, PR process, and code style.
+
+## Requirements
+- Prerequisites: Rust, Soroban CLI, wasm32 target
+- How to build: cargo build --target wasm32-unknown-unknown --release`n- How to run tests: cargo test`n- Code style: no unwrap() in production code, all public functions documented
+- PR checklist: tests pass, no new warnings, docs updated
+- How to report bugs and request features
+
+## Acceptance Criteria
+- [ ] Guide covers all sections above
+- [ ] Commands are copy-pasteable and correct
+- [ ] Links to Soroban docs
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #40 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add Stellar Expert deep-link for every transaction
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+After a claim or revoke transaction, users have no way to verify it on-chain. Add a link to Stellar Expert after every successful transaction.
+
+## Task
+After invokeContract resolves, return the transaction hash and display a 'View on Stellar Expert' link in the toast notification.
+
+## Requirements
+- invokeContract in contract.ts returns { returnValue, txHash }`n- Toast success message includes a clickable link: https://stellar.expert/explorer/testnet/tx/{hash}`n- Link opens in new tab
+- Works for claim, revoke, create, and transfer_ownership
+
+## Acceptance Criteria
+- [ ] Hash link appears in success toast
+- [ ] Link opens correct transaction on Stellar Expert
+- [ ] Works on both testnet and mainnet URLs
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #41 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: clamp progress bar to 100% when slightly over due to rounding
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+Due to integer rounding in calculate_vested, the progress percentage in VestingCard.tsx can briefly show 101% just before full vesting. The Math.min(100, ...) clamp exists but the label still shows the raw value.
+
+## Task
+Ensure both the progress bar width and the {progressPct}% vested label are clamped to 100.
+
+## Acceptance Criteria
+- [ ] Label never shows more than 100%
+- [ ] Progress bar never overflows its container
+- [ ] No visual glitch at full vesting
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #42 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: handle missing VITE_CONTRACT_ID env var with clear error message
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+If VITE_CONTRACT_ID is not set, DEFAULT_CONFIG.contractId is an empty string and all contract calls fail with a cryptic SDK error.
+
+## Task
+Add a startup check in contract.ts that throws a descriptive error if required env vars are missing.
+
+## Requirements
+- Check VITE_CONTRACT_ID and VITE_TOKEN_ID on module load
+- Throw: 'Missing env var: VITE_CONTRACT_ID. See .env.example.'`n- Show the error message in the Dashboard error state
+
+## Acceptance Criteria
+- [ ] Clear error shown when env vars missing
+- [ ] .env.example lists all required vars
+- [ ] No cryptic SDK errors
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #43 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: chore: add Prettier config and format all frontend files
+
+Labels: Stellar Wave, chore, trivial
+
+Description:
+## Summary
+The frontend has no Prettier config. Code style is inconsistent across components.
+
+## Task
+Add a .prettierrc to rontend/ and run Prettier across all .ts and .tsx files.
+
+## Requirements
+- Config: singleQuote: true, semi: true, printWidth: 100, 	railingComma: 'all'`n- Add ormat script to package.json: prettier --write 'src/**/*.{ts,tsx}'`n- Format all existing files
+- Add Prettier to devDependencies`n
+## Acceptance Criteria
+- [ ] 
+pm run format runs without errors
+- [ ] No formatting diff after running Prettier
+- [ ] Config committed to repo
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #44 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: docs: add JSDoc comments to all functions in contract.ts
+
+Labels: Stellar Wave, documentation, trivial
+
+Description:
+## Summary
+services/contract.ts has some JSDoc but several functions (getBeneficiaries, 	ransferOwnership, parseVestingInfo) are undocumented.
+
+## Task
+Add JSDoc comments to every exported function and the invokeContract helper in contract.ts.
+
+## Requirements
+- Each function: @param, @returns, @throws where applicable
+- invokeContract: document the polling loop behaviour
+- parseVestingInfo: document the raw XDR-to-type mapping
+
+## Acceptance Criteria
+- [ ] All exported functions have JSDoc
+- [ ] No @param missing for any parameter
+- [ ] Docs render correctly in VS Code IntelliSense
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #45 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: truncate long beneficiary addresses in VestingCard header
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+Full 56-character Stellar addresses overflow the VestingCard header on smaller screens and even on desktop when the card is narrow.
+
+## Task
+Truncate the address display to show first 6 and last 4 characters: GABCD...WXYZ. Full address shown on hover via 	itle attribute.
+
+## Requirements
+- Create a 	runcateAddress(addr: string): string utility in a new src/utils/format.ts`n- Apply to beneficiary address in VestingCard.tsx`n- Full address in 	itle attribute for accessibility
+- Tooltip shows full address on hover
+
+## Acceptance Criteria
+- [ ] Truncated format: GABCD...WXYZ`n- [ ] Full address visible on hover
+- [ ] No layout overflow
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #46 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: chore: add .editorconfig to enforce consistent indentation
+
+Labels: Stellar Wave, chore, trivial
+
+Description:
+## Summary
+The repo has no .editorconfig. Contributors using different editors produce mixed tabs/spaces and line endings.
+
+## Task
+Add a .editorconfig at the repo root covering both Rust and TypeScript files.
+
+## Requirements
+- indent_style = space for all files
+- indent_size = 4 for .rs files
+- indent_size = 2 for .ts, .tsx, .json files
+- end_of_line = lf`n- 	rim_trailing_whitespace = true`n
+## Acceptance Criteria
+- [ ] .editorconfig present at repo root
+- [ ] Settings match existing code style
+- [ ] Documented in CONTRIBUTING.md
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #47 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: disable Claim button while transaction is in-flight
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+If a user double-clicks the Claim button before the first transaction confirms, two claim transactions are submitted. The second will fail on-chain but wastes fees.
+
+## Task
+Ensure the Claim button is disabled from the moment it is clicked until the transaction fully confirms and the schedule data is refreshed.
+
+## Requirements
+- loading state in VestingCard already exists � verify it covers the full async flow
+- Disable button during handleClaim execution
+- Same fix for Revoke button
+- Add ria-busy attribute while loading
+
+## Acceptance Criteria
+- [ ] Button disabled immediately on click
+- [ ] Re-enabled only after data refresh completes
+- [ ] ria-busy=true set during loading
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #48 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: docs: add inline comments to storage.rs explaining TTL and storage tiers
+
+Labels: Stellar Wave, documentation, trivial
+
+Description:
+## Summary
+storage.rs uses both instance() and persistent() storage without explaining why. New contributors are confused about the difference.
+
+## Task
+Add inline comments to storage.rs explaining when to use instance vs persistent storage and why each key uses the tier it does.
+
+## Requirements
+- Comment above each storage tier section explaining: what it is, its TTL behaviour, why it's used here
+- Comment on Beneficiaries key explaining the O(n) iteration tradeoff
+- Comment on Schedule(Address) explaining why persistent is needed for long-lived data
+
+## Acceptance Criteria
+- [ ] Every storage function has an explanatory comment
+- [ ] Comments are accurate per Soroban docs
+- [ ] No code changes � docs only
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #49 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: show human-readable error messages from contract errors in UI
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+When a contract call fails, the UI shows raw SDK error strings like 'HostError: Error(Contract, #5)'. Map these to human-readable messages.
+
+## Task
+Create an parseContractError(err: unknown): string utility that maps Soroban error codes to readable strings matching VestingError in errors.rs.
+
+## Requirements
+- Map error codes 1-12 to readable strings (e.g. #5 ? 'Nothing to claim yet')
+- Fallback to generic 'Transaction failed. Please try again.' for unknown codes
+- Used in Dashboard catch blocks and toast errors
+
+## Acceptance Criteria
+- [ ] All 12 VestingError codes mapped
+- [ ] Fallback message for unknown errors
+- [ ] No raw SDK error strings shown to users
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #50 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: chore: add LICENSE file to repository
+
+Labels: Stellar Wave, chore, trivial
+
+Description:
+## Summary
+The repository has no LICENSE file. Open-source contributors need to know the terms under which they can use and contribute to the code.
+
+## Task
+Add an Apache 2.0 LICENSE file to the repository root and reference it in README.md.
+
+## Requirements
+- Add LICENSE file with full Apache 2.0 text
+- Add license badge to README.md  
+- Add license header comment to contract/src/lib.rs`n
+## Acceptance Criteria
+- [ ] LICENSE file present at repo root
+- [ ] README badge links to LICENSE
+- [ ] lib.rs has license header
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #51 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: add loading spinner to WalletButton during connection
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+When the user clicks 'Connect Wallet', the button text does not change and there is no visual feedback while Freighter is opening.
+
+## Task
+Update WalletButton.tsx to show a spinner and 'Connecting...' text while isConnecting is true in walletStore.
+
+## Requirements
+- Show spinner SVG (inline, no library) while isConnecting  
+- Button disabled during connection
+- 'Connect Wallet' text when disconnected
+- Truncated address when connected
+
+## Acceptance Criteria
+- [ ] Spinner visible during connection
+- [ ] Button disabled while connecting
+- [ ] No layout shift when text changes
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #52 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: docs: document all VestingError codes in CONTRACT.md
+
+Labels: Stellar Wave, documentation, trivial
+
+Description:
+## Summary
+docs/CONTRACT.md does not list the error codes that the contract can return. Integrators need this to handle errors correctly.
+
+## Task
+Add an 'Error Codes' section to docs/CONTRACT.md listing all 12 VestingError variants with their numeric code and description.
+
+## Requirements
+- Table format: Code | Name | Description
+- All 12 errors from errors.rs covered
+- Include when each error is returned (which function)
+
+## Acceptance Criteria
+- [ ] All 12 errors documented
+- [ ] Table is correctly formatted Markdown
+- [ ] Each error links to the function that returns it
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #53 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: ci: add frontend build check to GitHub Actions
+
+Labels: Stellar Wave, ci, trivial
+
+Description:
+## Summary
+There is no CI check for the frontend. A broken 
+pm run build can be merged undetected.
+
+## Task
+Create .github/workflows/frontend-build.yml that runs 
+pm run build in rontend/ on every push and PR.
+
+## Requirements
+- Triggers on push to main and all PRs
+- Sets up Node.js 20
+- Runs 
+pm ci then 
+pm run build`n- Caches 
+ode_modules using ctions/cache`n- Fails the check if build exits non-zero
+
+## Acceptance Criteria
+- [ ] Workflow file is valid YAML
+- [ ] Build passes in CI
+- [ ] Cache reduces install time on subsequent runs
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #54 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: add favicon and page title to frontend
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+The app uses the default Vite favicon and title 'Vite + React'. Update these to match the PropChain/Soroban Vesting brand.
+
+## Task
+Replace the favicon and update the <title> tag in index.html.
+
+## Requirements
+- New favicon: a simple SVG lock/token icon (create inline SVG)
+- Page title: 'Soroban Vesting'
+- Tab title updates to 'Dashboard | Soroban Vesting' when on dashboard
+- Use document.title in the Dashboard component
+
+## Acceptance Criteria
+- [ ] Custom favicon visible in browser tab
+- [ ] Page title is 'Soroban Vesting'
+- [ ] Dashboard tab title updates correctly
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #55 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: chore: pin all frontend dependencies to exact versions
+
+Labels: Stellar Wave, chore, trivial
+
+Description:
+## Summary
+rontend/package.json uses ^ version ranges. This can cause unexpected breakage when dependencies release minor updates.
+
+## Task
+Run 
+pm shrinkwrap or manually pin all dependencies in package.json to exact versions (remove ^ and ~ prefixes).
+
+## Requirements
+- All dependencies and devDependencies use exact versions
+- package-lock.json committed and up to date
+- 
+pm ci passes after pinning
+
+## Acceptance Criteria
+- [ ] No ^ or ~ in package.json`n- [ ] 
+pm ci succeeds
+- [ ] 
+pm run build still passes
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #56 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: add aria-labels to all icon-only buttons
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+Several buttons in the UI (copy, revoke, close) have no text label and no ria-label, making them inaccessible to screen reader users.
+
+## Task
+Audit all buttons in the frontend and add ria-label to any button that has no visible text.
+
+## Requirements
+- Audit: WalletButton, VestingCard action buttons, any future icon buttons
+- Add descriptive ria-label to each (e.g. ria-label='Revoke vesting schedule')
+- Add 	itle attribute as tooltip fallback
+
+## Acceptance Criteria
+- [ ] All icon-only buttons have ria-label`n- [ ] Screen reader announces correct action
+- [ ] No new buttons added without aria-label
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #57 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: docs: add sequence diagram for create-claim-revoke flow to CONTRACT.md
+
+Labels: Stellar Wave, documentation, trivial
+
+Description:
+## Summary
+New contributors struggle to understand the flow between owner, beneficiary, and contract. A sequence diagram would clarify this.
+
+## Task
+Add a Mermaid sequence diagram to docs/CONTRACT.md showing the full create ? claim ? revoke flow.
+
+## Requirements
+- Diagram covers: initialize, create_schedule (with token transfer), claim, revoke
+- Shows actors: Owner, Beneficiary, VestingContract, TokenContract
+- Rendered correctly on GitHub (Mermaid is supported)
+- Add diagram under a new 'Flow Diagram' section
+
+## Acceptance Criteria
+- [ ] Diagram renders on GitHub
+- [ ] All 4 actors shown
+- [ ] Token transfers shown as arrows
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #58 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: chore: add cargo clippy to CI workflow
+
+Labels: Stellar Wave, ci, trivial
+
+Description:
+## Summary
+The contract CI only runs cargo test. Add cargo clippy to catch common Rust mistakes and enforce code quality.
+
+## Task
+Update .github/workflows/contract-tests.yml to also run cargo clippy -- -D warnings in the contract/ directory.
+
+## Requirements
+- Clippy runs after tests
+- -D warnings treats all warnings as errors
+- Fix any existing clippy warnings in the codebase
+- Add clippy step to the existing workflow (do not create a new file)
+
+## Acceptance Criteria
+- [ ] Clippy passes with zero warnings
+- [ ] CI fails if new warnings are introduced
+- [ ] Existing code is clippy-clean
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #59 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: validate start_time is not in the past in CreateScheduleForm
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+The CreateScheduleForm allows selecting a start date in the past. While the contract accepts it, it creates a confusing UX where the cliff is already passed at creation.
+
+## Task
+Add a validation rule in CreateScheduleForm.tsx that warns (not blocks) when startDate is more than 7 days in the past.
+
+## Requirements
+- Show a yellow warning (not error) below the date field: 'Start date is in the past. Cliff may already be reached.
+- Do not block form submission
+- Warning disappears when date is set to today or future
+
+## Acceptance Criteria
+- [ ] Warning shown for past dates
+- [ ] Form still submittable with past date
+- [ ] No warning for today or future dates
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #60 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: chore: add SECURITY.md with vulnerability disclosure policy
+
+Labels: Stellar Wave, chore, trivial
+
+Description:
+## Summary
+The repository has no security policy. GitHub shows a warning and security researchers have no guidance on how to report vulnerabilities.
+
+## Task
+Create SECURITY.md at the repo root with a responsible disclosure policy.
+
+## Requirements
+- Supported versions table
+- How to report: email address or GitHub private advisory
+- Response time commitment (e.g. 48 hours acknowledgement)
+- What to include in a report (steps to reproduce, impact)
+- Out-of-scope items (testnet-only issues)
+
+## Acceptance Criteria
+- [ ] SECURITY.md present at repo root
+- [ ] GitHub security tab shows the policy
+- [ ] All sections above covered
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #61 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: implement vesting schedule delegation (claim on behalf)
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Some beneficiaries want to allow a trusted third party (e.g. a DAO treasury contract) to claim tokens on their behalf without transferring ownership of the schedule.
+
+## Task
+Add a set_delegate(env, beneficiary, delegate) function. When a delegate is set, claim can be called by either the beneficiary or the delegate.
+
+## Requirements
+- set_delegate(env, beneficiary, delegate: Address) � requires beneficiary auth
+- emove_delegate(env, beneficiary) � requires beneficiary auth
+- claim accepts either beneficiary or delegate auth
+- Store delegate in DataKey::Delegate(Address)`n- Emit DELEGATE_SET and DELEGATE_REMOVED events
+- Tests: delegate claims successfully, non-delegate cannot claim
+
+## Acceptance Criteria
+- [ ] Delegate can claim on behalf of beneficiary
+- [ ] Non-delegate claim attempt fails with NotOwner`n- [ ] Delegate can be removed and re-set
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #62 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add on-chain vesting schedule merkle proof for airdrops
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+For large token launches (1000+ beneficiaries), creating individual schedules is too expensive. Add a merkle-proof based claim system where the owner commits a merkle root and beneficiaries self-register.
+
+## Task
+Add a commit_merkle_root(env, root: BytesN<32>) function and a egister_schedule(env, proof: Vec<BytesN<32>>, leaf_data: ...) function that verifies the proof and creates the schedule.
+
+## Requirements
+- Owner commits a merkle root of all (beneficiary, amount, cliff, duration) tuples
+- Beneficiary calls egister_schedule with their merkle proof
+- Contract verifies proof before creating schedule
+- Prevents double-registration
+- Off-chain script to generate merkle tree and proofs
+
+## Acceptance Criteria
+- [ ] Valid proof creates schedule
+- [ ] Invalid proof rejected
+- [ ] Double-registration rejected
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #63 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add vesting schedule simulation page
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Potential beneficiaries want to simulate what their vesting schedule would look like before it is created. Add a standalone simulation page with no wallet required.
+
+## Task
+Create a /simulate route with a form identical to CreateScheduleForm but instead of submitting, it renders a live VestingChart and stats preview.
+
+## Requirements
+- Route /simulate accessible without wallet
+- All form fields from CreateScheduleForm (amount, cliff, duration, start date)
+- Live VestingChart updates as user changes inputs
+- Shows: cliff date, end date, monthly unlock amount
+- 'Create this schedule' CTA that redirects to dashboard with form pre-filled
+
+## Acceptance Criteria
+- [ ] Chart updates in real-time as inputs change
+- [ ] No wallet required to use simulator
+- [ ] CTA pre-fills the create form
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #64 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add Soroban contract upgrade mechanism
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+The contract has no upgrade path. If a bug is found, the only option is to deploy a new contract and migrate all schedules manually. Add an upgrade mechanism using Soroban's update_current_contract_wasm.
+
+## Task
+Add an upgrade(env, new_wasm_hash: BytesN<32>) function that replaces the contract WASM.
+
+## Requirements
+- Owner-only with auth
+- Calls env.deployer().update_current_contract_wasm(new_wasm_hash)  
+- Emit UPGRADED event with old and new hash
+- Add upgrade instructions to docs/DEPLOYMENT.md`n- Test: upgrade with valid hash succeeds, non-owner fails
+
+## Acceptance Criteria
+- [ ] Upgrade function compiles
+- [ ] Non-owner upgrade attempt fails
+- [ ] Deployment docs updated
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #65 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: build embeddable vesting widget for third-party sites
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Projects that use this vesting contract want to embed a vesting status widget on their own website without building their own UI.
+
+## Task
+Create a standalone embeddable widget (single JS file) that renders a minimal vesting card for a given beneficiary address and contract ID.
+
+## Requirements
+- Single widget.js bundle built with Vite library mode
+- Accepts config via data- attributes on a <div>: data-contract-id, data-beneficiary, data-network`n- Shows: vested %, claimable amount, cliff/end dates
+- No wallet required (read-only)
+- Self-contained CSS (no external stylesheets)
+
+## Acceptance Criteria
+- [ ] Widget renders with a single <script> tag
+- [ ] Works on a plain HTML page
+- [ ] No external dependencies loaded at runtime
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #66 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add multi-owner governance (2-of-3 multisig) for contract admin
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+A single owner address is a security risk. Add a 2-of-3 multisig governance model so that critical actions (revoke, upgrade, transfer_ownership) require approval from 2 out of 3 designated signers.
+
+## Task
+Implement a proposal-and-approval pattern: any owner can propose an action, a second owner approves it, and the action executes automatically on approval.
+
+## Requirements
+- set_owners(env, owners: Vec<Address>) � sets up to 3 owners
+- propose_action(env, action_type, params) � any owner proposes
+- pprove_action(env, proposal_id) � second owner approves and executes
+- Actions: revoke, transfer_ownership, upgrade
+- Proposals expire after 24 hours
+- Tests: single approval does not execute, second approval executes
+
+## Acceptance Criteria
+- [ ] Action only executes with 2 approvals
+- [ ] Expired proposals cannot be approved
+- [ ] Single-owner setup still works (backward compatible)
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #67 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add vesting analytics dashboard with charts
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+The admin view shows raw schedule data but no aggregate analytics. Add a dedicated analytics section with charts showing token distribution over time.
+
+## Task
+Add an analytics panel to the owner dashboard with charts built using the existing VestingChart component or a lightweight charting library.
+
+## Requirements
+- Total tokens locked vs claimed vs unvested � donut chart
+- Tokens unlocking per month over the next 12 months � bar chart
+- Number of schedules by status � pie chart
+- All charts calculated client-side from llInfos data
+- Responsive layout, works on mobile
+
+## Acceptance Criteria
+- [ ] All 3 charts render correctly
+- [ ] Charts update when schedules change
+- [ ] No chart library adds more than 50KB to bundle
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #68 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add Soroban event indexer integration for real-time updates
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+The dashboard requires manual refresh to see new data. Integrate with a Soroban event indexer (e.g. Mercury or Subquery) to push real-time updates to the frontend.
+
+## Task
+Set up a WebSocket or polling connection to an event indexer and update the dashboard state automatically when CREATED, CLAIMED, or REVOKED events are detected.
+
+## Requirements
+- New useContractEvents(config) hook that subscribes to contract events
+- Updates myInfo and llInfos state automatically on new events
+- Reconnects automatically on disconnect
+- Shows a 'Live' indicator badge in the dashboard header
+- Falls back to manual refresh if indexer unavailable
+
+## Acceptance Criteria
+- [ ] Dashboard updates within 5 seconds of on-chain event
+- [ ] Live badge visible when connected to indexer
+- [ ] Graceful fallback when indexer is down
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #69 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add vesting schedule template system
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Owners repeatedly create schedules with the same parameters (e.g. standard 4-year/1-year-cliff employee vesting). Add a template system to save and reuse schedule configurations.
+
+## Task
+Add a template management UI that lets owners save, name, and reuse schedule parameter presets.
+
+## Requirements
+- Templates stored in localStorage (no backend needed)
+- 'Save as template' button on CreateScheduleForm after filling in fields
+- Template selector dropdown at top of form
+- Selecting a template pre-fills all fields
+- Built-in templates: '4yr/1yr cliff', '2yr/6mo cliff', 'Immediate (no cliff)'
+- Delete template button
+
+## Acceptance Criteria
+- [ ] Templates persist across page refreshes
+- [ ] Selecting template fills all form fields
+- [ ] Built-in templates cannot be deleted
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #70 � HIGH (200 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add Stellar Turrets / soroban-auth integration for gasless claims
+
+Labels: Stellar Wave, enhancement, high complexity
+
+Description:
+## Summary
+Beneficiaries need XLM to pay transaction fees to claim their tokens. This is a poor UX for non-crypto-native users. Implement a fee sponsorship flow so beneficiaries can claim without holding XLM.
+
+## Task
+Integrate Stellar fee-bump transactions so the contract owner or a sponsorship service pays the transaction fee on behalf of beneficiaries.
+
+## Requirements
+- New sponsoredClaim(config, beneficiaryAddress) function in contract.ts`n- Builds an inner transaction signed by beneficiary
+- Wraps in a fee-bump transaction signed by sponsor
+- Sponsor keypair loaded from environment variable (server-side only)
+- Frontend shows 'Claim for free (sponsored)' button when sponsorship available
+
+## Acceptance Criteria
+- [ ] Beneficiary can claim without XLM balance
+- [ ] Sponsor pays the fee
+- [ ] Sponsorship endpoint secured (rate-limited)
+
+**Complexity:** High | **Points:** 200
+
+
+-------------------------------------------------------------------------------
+ISSUE #71 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add keyboard navigation support to all modals and dropdowns
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Modals and dropdowns in the frontend are not keyboard navigable. Users cannot Tab through options or close modals with Escape.
+
+## Task
+Audit all interactive overlays and ensure full keyboard support: Tab/Shift-Tab navigation, Enter to confirm, Escape to close, focus trap inside modals.
+
+## Requirements
+- Focus trap inside any open modal
+- Escape key closes modals and dropdowns
+- First focusable element receives focus when modal opens
+- Focus returns to trigger element when modal closes
+- Applies to: CreateScheduleForm modal, confirm dialogs, network switcher dropdown
+
+## Acceptance Criteria
+- [ ] All modals closeable with Escape
+- [ ] Tab cycles through modal elements only
+- [ ] Focus restored on close
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #72 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add pagination to All Schedules owner view
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+When there are more than 20 schedules, the All Schedules grid becomes very long and slow to render. Add pagination.
+
+## Task
+Add client-side pagination to the schedules grid in Dashboard.tsx with 10 schedules per page.
+
+## Requirements
+- Page size: 10 schedules
+- Previous / Next buttons
+- Page indicator: 'Page 2 of 5'
+- Pagination resets to page 1 when search/filter changes
+- Smooth scroll to top of grid on page change
+
+## Acceptance Criteria
+- [ ] Correct number of schedules per page
+- [ ] Page indicator accurate
+- [ ] Filter reset works
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #73 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: test: add Vitest unit tests for frontend utility functions
+
+Labels: Stellar Wave, testing, medium complexity
+
+Description:
+## Summary
+The frontend has no unit tests. Add Vitest tests for pure utility functions and hooks.
+
+## Task
+Set up Vitest in rontend/ and write unit tests for: address truncation, date formatting, calculate_vested JS port, and parseContractError.
+
+## Requirements
+- Add itest and @testing-library/react to devDependencies
+- Add 	est script to package.json: itest run`n- Tests for: 	runcateAddress, ormatTs, parseContractError, useLiveClaimable hook
+- At least 15 test cases total
+
+## Acceptance Criteria
+- [ ] 
+pm test passes
+- [ ] All utility functions covered
+- [ ] Hook tests use enderHook from testing-library
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #74 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add confirm dialog before revoke action
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+The Revoke button in VestingCard immediately triggers the transaction with no confirmation step. A misclick can irreversibly revoke a schedule.
+
+## Task
+Add a confirmation modal that appears when the owner clicks Revoke, showing the beneficiary address and unvested amount before proceeding.
+
+## Requirements
+- Modal shows: beneficiary address, unvested token amount, warning text
+- Two buttons: 'Cancel' and 'Confirm Revoke'
+- Cancel closes modal with no action
+- Confirm proceeds with the revoke transaction
+- Modal is keyboard accessible (Escape = cancel, Enter = confirm)
+
+## Acceptance Criteria
+- [ ] Modal appears before any transaction is sent
+- [ ] Cancel does not trigger transaction
+- [ ] Correct unvested amount shown in modal
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #75 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add token price integration to show USD value of vested tokens
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Token amounts are shown in raw units. Users want to see the approximate USD value of their vested and claimable tokens.
+
+## Task
+Integrate with the CoinGecko public API to fetch the token price and display USD values alongside token amounts in VestingCard.
+
+## Requirements
+- New useTokenPrice(tokenSymbol) hook that fetches price from CoinGecko
+- Caches price for 5 minutes in memory
+- Shows USD value below each token amount: '12,000 tokens (~,440.00)'
+- Gracefully hides USD values if price fetch fails
+- Token symbol configurable via env var VITE_TOKEN_SYMBOL`n
+## Acceptance Criteria
+- [ ] USD values shown when price available
+- [ ] Hidden gracefully when price unavailable
+- [ ] Price cached to avoid rate limiting
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #76 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add deploy script for automated testnet deployment
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+scripts/deploy.sh exists but is incomplete. Automate the full deployment: compile, deploy contract, deploy token, initialize contract, and output a ready-to-use .env file.
+
+## Task
+Rewrite scripts/deploy.sh to be a fully automated one-command testnet deployment.
+
+## Requirements
+- Compile contract to WASM
+- Deploy WASM and capture contract ID
+- Deploy a test SAC token and capture token ID
+- Call initialize with deployer as owner
+- Write rontend/.env with all required vars
+- Print a summary: contract ID, token ID, explorer links
+- Works with Soroban CLI v21+
+
+## Acceptance Criteria
+- [ ] Single ash scripts/deploy.sh deploys everything
+- [ ] .env file written automatically
+- [ ] Summary printed at end
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #77 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add VestingChart interactive tooltip on hover
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+VestingChart.tsx renders a static SVG chart. Add interactive tooltips that show the exact vested amount and date when the user hovers over the chart line.
+
+## Task
+Add mouse event handlers to VestingChart.tsx that display a tooltip with date and vested amount at the cursor position.
+
+## Requirements
+- Tooltip shows: date (formatted), vested amount, % of total
+- Tooltip follows cursor along the chart line
+- Tooltip disappears when cursor leaves the chart
+- Works on touch devices (tap to show, tap elsewhere to hide)
+- No new charting libraries
+
+## Acceptance Criteria
+- [ ] Tooltip appears on hover
+- [ ] Values are accurate at cursor position
+- [ ] Works on mobile touch
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #78 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add Freighter wallet deep-link for mobile users
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Mobile users without the Freighter browser extension see a generic 'Wallet not found' error. Add a deep-link to open the Freighter mobile app or redirect to the install page.
+
+## Task
+Update wallet.ts and WalletButton.tsx to detect mobile and show appropriate install/open prompts.
+
+## Requirements
+- Detect if Freighter is installed using window.freighter  
+- If not installed on desktop: show 'Install Freighter' link to Chrome Web Store
+- If on mobile: show 'Open in Freighter' deep-link button
+- Deep-link format: reighter://open?url=<current_url>`n- Fallback: show QR code linking to the app
+
+## Acceptance Criteria
+- [ ] Install link shown on desktop without Freighter
+- [ ] Deep-link shown on mobile
+- [ ] QR code fallback renders correctly
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #79 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add print/PDF export for individual vesting schedule
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+Beneficiaries sometimes need a printable summary of their vesting schedule for legal or HR purposes. Add a print-friendly view.
+
+## Task
+Add a 'Print / Save as PDF' button to VestingCard that opens a print-optimised view of the schedule.
+
+## Requirements
+- Print button triggers window.print()  
+- Add @media print CSS that hides navbar, buttons, and chart
+- Print view shows: beneficiary address, all schedule parameters, current vested/claimed amounts, timeline
+- Page title set to 'Vesting Schedule - {truncated address}' before printing
+- Restore title after print dialog closes
+
+## Acceptance Criteria
+- [ ] Print dialog opens on button click
+- [ ] Only schedule data visible in print preview
+- [ ] Page title correct in print
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #80 � MEDIUM (150 points)
+-------------------------------------------------------------------------------
+
+Title: feat: add multi-language (i18n) support to frontend
+
+Labels: Stellar Wave, enhancement, medium complexity
+
+Description:
+## Summary
+All UI text is hardcoded in English. Add internationalisation support so the app can be translated into other languages.
+
+## Task
+Integrate i18next with eact-i18next and extract all UI strings into translation files. Provide English and Spanish translations as a starting point.
+
+## Requirements
+- All user-facing strings moved to src/locales/en.json and src/locales/es.json  
+- Language switcher in navbar (EN / ES)
+- Persists language preference in localStorage  
+- Covers: all labels, button text, error messages, empty states
+- Date formatting respects selected locale
+
+## Acceptance Criteria
+- [ ] Switching to Spanish translates all UI strings
+- [ ] Language persists on refresh
+- [ ] No hardcoded English strings remain in components
+
+**Complexity:** Medium | **Points:** 150
+
+
+-------------------------------------------------------------------------------
+ISSUE #81 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: remove_beneficiary is defined in storage.rs but never called
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+emove_beneficiary is implemented in storage.rs but is never called anywhere in the contract � not in evoke or any other function. This means revoked beneficiaries remain in the beneficiary list forever, inflating get_beneficiaries results.
+
+## Task
+Call emove_beneficiary inside the evoke function in lib.rs after marking the schedule as revoked, OR document why it is intentionally kept (e.g. to allow claiming vested tokens post-revoke).
+
+## Requirements
+- If removing: call emove_beneficiary in evoke after state update
+- If keeping: add a code comment explaining the design decision
+- Update get_beneficiaries docs to clarify whether revoked addresses are included
+- Add a test asserting the chosen behaviour
+
+## Acceptance Criteria
+- [ ] Chosen behaviour is consistent and documented
+- [ ] Test covers the revoke + beneficiary list scenario
+- [ ] No dead code warnings
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #82 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: has_owner is defined in storage.rs but never used
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+has_owner is exported from storage.rs but is never called anywhere in the contract. This is dead code that adds confusion.
+
+## Task
+Either use has_owner in the initialize function as an alternative initialisation check, or remove it and replace with the existing is_initialized pattern.
+
+## Requirements
+- If using: replace is_initialized check in initialize with has_owner where appropriate
+- If removing: delete has_owner from storage.rs  
+- Ensure no compilation warnings after change
+- Update any tests that reference the function
+
+## Acceptance Criteria
+- [ ] No unused function warnings from cargo build  
+- [ ] cargo clippy passes cleanly
+- [ ] Decision documented with a comment
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #83 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: getVestingInfo uses a dummy account with hardcoded sequence number
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+In contract.ts, getVestingInfo and getBeneficiaries construct a fake account object with sequenceNumber: () => '0' to perform read-only simulations. This is fragile and may break with future SDK versions.
+
+## Task
+Replace the dummy account pattern with the official Soroban RPC simulation approach that does not require an account object for read-only calls.
+
+## Requirements
+- Use server.simulateTransaction with a properly constructed transaction that does not require a real account
+- Or use the Stellar SDK's SorobanRpc.Server.simulateTransaction with a minimal valid source account fetched from the network
+- Remove the s any cast
+- All read-only queries (getVestingInfo, getBeneficiaries) updated
+
+## Acceptance Criteria
+- [ ] No s any casts in read-only query functions
+- [ ] Queries work correctly on testnet
+- [ ] No TypeScript errors
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #84 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: VestingChart has no empty state when schedule data is undefined
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+VestingChart.tsx receives a schedule prop and renders an SVG. If schedule is undefined or has 	otalAmount = 0n, the chart renders a broken or empty SVG with no user feedback.
+
+## Task
+Add a guard in VestingChart.tsx that renders a placeholder message when the schedule has no data to display.
+
+## Requirements
+- Check for !schedule or schedule.totalAmount === 0n at the top of the component
+- Render a styled empty state: 'No vesting data to display'
+- Empty state matches the card's visual style (uses CSS variables)
+- Add a prop type guard using TypeScript
+
+## Acceptance Criteria
+- [ ] Empty state renders instead of broken SVG
+- [ ] No console errors when schedule is undefined
+- [ ] Matches card visual style
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+ISSUE #85 � TRIVIAL (100 points)
+-------------------------------------------------------------------------------
+
+Title: fix: invokeContract polling loop has no timeout � can hang forever
+
+Labels: Stellar Wave, bug, trivial
+
+Description:
+## Summary
+In contract.ts, the invokeContract function polls server.getTransaction(submitResult.hash) in a while loop with no maximum retry count or timeout. If the transaction is lost or the RPC is unresponsive, the loop hangs forever and the UI freezes.
+
+## Task
+Add a maximum retry limit and a timeout to the polling loop in invokeContract.
+
+## Requirements
+- Max retries: 30 (30 seconds at 1s interval)
+- After max retries, throw: 'Transaction confirmation timeout. Check Stellar Explorer for status.'`n- Include the transaction hash in the error message
+- Add a pollingTimeoutMs option to ContractConfig (default 30000)
+- Update ContractConfig type in 	ypes/index.ts  
+
+## Acceptance Criteria
+- [ ] Loop exits after 30 retries with a clear error
+- [ ] Transaction hash included in timeout error
+- [ ] pollingTimeoutMs is configurable
+
+**Complexity:** Trivial | **Points:** 100
+
+
+-------------------------------------------------------------------------------
+END � Total: 85 issues, 11,200 points
+-------------------------------------------------------------------------------
