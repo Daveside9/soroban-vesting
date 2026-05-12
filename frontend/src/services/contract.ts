@@ -12,6 +12,9 @@ import {
 import { signTx } from './wallet';
 import type { VestingInfo, ContractConfig } from '../types';
 
+const TRANSACTION_POLL_INTERVAL_MS = 1000;
+const TRANSACTION_POLL_TIMEOUT_MS = 60_000;
+
 // Default testnet config — override via environment variables
 export const DEFAULT_CONFIG: ContractConfig = {
   contractId: import.meta.env.VITE_CONTRACT_ID ?? '',
@@ -67,9 +70,18 @@ async function invokeContract(
   }
 
   // Poll for result
+  const pollStartedAt = Date.now();
   let getResult = await server.getTransaction(submitResult.hash);
   while (getResult.status === SorobanRpc.Api.GetTransactionStatus.NOT_FOUND) {
-    await new Promise((r) => setTimeout(r, 1000));
+    if (Date.now() - pollStartedAt >= TRANSACTION_POLL_TIMEOUT_MS) {
+      throw new Error(
+        `Timed out waiting for transaction ${submitResult.hash} after ${
+          TRANSACTION_POLL_TIMEOUT_MS / 1000
+        } seconds`,
+      );
+    }
+
+    await new Promise((r) => setTimeout(r, TRANSACTION_POLL_INTERVAL_MS));
     getResult = await server.getTransaction(submitResult.hash);
   }
 
