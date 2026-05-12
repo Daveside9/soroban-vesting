@@ -1,105 +1,31 @@
 #!/usr/bin/env node
 /**
  * post-issues.js
- * Parses ISSUES_TO_POST.txt and creates all issues on GitHub via the REST API.
- * Skips issues that already exist (matched by title) to avoid duplicates.
+ * Parses ISSUES_TO_POST.txt and creates all issues using the GitHub CLI (gh).
  *
- * Usage:
- *   GITHUB_TOKEN=your_pat_here node scripts/post-issues.js
+ * Setup (one time only):
+ *   1. Install GitHub CLI: https://cli.github.com
+ *   2. Run: gh auth login   (follow the browser prompts)
  *
- * In GitHub Actions, set a repository secret named ISSUES_PAT with a
- * Personal Access Token that has the 'public_repo' scope.
- *
- * Get a PAT at: https://github.com/settings/tokens
+ * Then run this script:
+ *   node scripts/post-issues.js
  */
 
-const https = require('https');
-const fs    = require('fs');
-const path  = require('path');
+const { execSync } = require('child_process');
+const fs   = require('fs');
+const path = require('path');
 
-// ── Config ────────────────────────────────────────────────────────────────────
-
-const REPO_OWNER  = 'Daveside9';
-const REPO_NAME   = 'soroban-vesting';
+const REPO        = 'Daveside9/soroban-vesting';
 const ISSUES_FILE = path.join(__dirname, '..', 'ISSUES_TO_POST.txt');
-const DELAY_MS    = 2000; // 2 s between requests — respects GitHub rate limits
 
-// Load token from env or .env file
-let GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-if (!GITHUB_TOKEN) {
-  const envPath = path.join(__dirname, '..', '.env');
-  if (fs.existsSync(envPath)) {
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const match = envContent.match(/^GITHUB_TOKEN=(.+)$/m);
-    if (match) GITHUB_TOKEN = match[1].trim();
-  }
-}
-if (!GITHUB_TOKEN) {
-  console.error('❌  GITHUB_TOKEN not set. Export it or add it to a .env file.');
+// ── Check gh is installed ─────────────────────────────────────────────────────
+
+try {
+  execSync('gh --version', { stdio: 'ignore' });
+} catch {
+  console.error('❌  GitHub CLI (gh) is not installed.');
+  console.error('    Download it from: https://cli.github.com');
   process.exit(1);
-}
-
-// ── GitHub API helper ─────────────────────────────────────────────────────────
-
-function githubRequest(method, apiPath, body) {
-  return new Promise((resolve, reject) => {
-    const payload = body ? JSON.stringify(body) : null;
-
-    const options = {
-      hostname: 'api.github.com',
-      path:     apiPath,
-      method,
-      headers: {
-        'Authorization':        `token ${GITHUB_TOKEN}`,
-        'Content-Type':         'application/json',
-        'User-Agent':           'soroban-vesting-issue-poster',
-        'Accept':               'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
-      },
-    };
-
-    const req = https.request(options, (res) => {
-      let data = '';
-      res.on('data', chunk => { data += chunk; });
-      res.on('end', () => {
-        try {
-          resolve({ status: res.statusCode, body: JSON.parse(data) });
-        } catch {
-          resolve({ status: res.statusCode, body: data });
-        }
-      });
-    });
-
-    req.on('error', reject);
-    if (payload) req.write(payload);
-    req.end();
-  });
-}
-
-// ── Fetch all existing issue titles (handles pagination) ──────────────────────
-
-async function fetchExistingTitles() {
-  const titles = new Set();
-  let page = 1;
-
-  while (true) {
-    const { status, body } = await githubRequest(
-      'GET',
-      `/repos/${REPO_OWNER}/${REPO_NAME}/issues?state=all&per_page=100&page=${page}`
-    );
-
-    if (status !== 200 || !Array.isArray(body) || body.length === 0) break;
-
-    for (const issue of body) {
-      titles.add(issue.title.trim());
-    }
-
-    if (body.length < 100) break;
-    page++;
-  }
-
-  return titles;
 }
 
 // ── Parser ────────────────────────────────────────────────────────────────────
@@ -107,8 +33,7 @@ async function fetchExistingTitles() {
 function parseIssues(filePath) {
   const content = fs.readFileSync(filePath, 'utf8');
   const issues  = [];
-
-  const blocks = content.split(/═{10,}/);
+  const blocks  = content.split(/═{10,}/);
 
   for (const block of blocks) {
     const trimmed = block.trim();
@@ -133,77 +58,69 @@ function parseIssues(filePath) {
   return issues;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Fetch existing issue titles to skip duplicates ────────────────────────────
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+function getExistingTitles() {
+  try {
+    const out = execSync(
+      `gh issue list --repo ${REPO} --state all --limit 200 --json title`,
+      { encoding: 'utf8' }
+    );
+    return new Set(JSON.parse(out).map(i => i.title.trim()));
+  } catch {
+    return new Set();
+  }
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-async function main() {
-  console.log(`\n🚀  Posting issues to ${REPO_OWNER}/${REPO_NAME}\n`);
+const issues = parseIssues(ISSUES_FILE);
+console.log(`\n🚀  Posting issues to ${REPO}`);
+console.log(`📋  Found ${issues.length} issues\n`);
 
-  // Parse issues file
-  const issues = parseIssues(ISSUES_FILE);
-  console.log(`📋  Found ${issues.length} issues in ISSUES_TO_POST.txt`);
+console.log('🔍  Checking for existing issues...');
+const existing = getExistingTitles();
+console.log(`    ${existing.size} already exist — will skip those\n`);
 
-  // Fetch already-existing issues to avoid duplicates
-  console.log(`🔍  Checking for existing issues...\n`);
-  const existingTitles = await fetchExistingTitles();
-  console.log(`    ${existingTitles.size} issues already exist on GitHub\n`);
+let created = 0;
+let skipped = 0;
+let failed  = 0;
 
-  let created = 0;
-  let skipped = 0;
-  let failed  = 0;
+for (let i = 0; i < issues.length; i++) {
+  const { title, labels, body } = issues[i];
+  const num = i + 1;
 
-  for (let i = 0; i < issues.length; i++) {
-    const issue = issues[i];
-    const num   = i + 1;
-
-    // Skip if already exists
-    if (existingTitles.has(issue.title)) {
-      console.log(`⏭️   [${num}/${issues.length}] SKIP (already exists) — ${issue.title}`);
-      skipped++;
-      continue;
-    }
-
-    try {
-      const { status, body } = await githubRequest(
-        'POST',
-        `/repos/${REPO_OWNER}/${REPO_NAME}/issues`,
-        { title: issue.title, body: issue.body, labels: issue.labels }
-      );
-
-      if (status === 201) {
-        console.log(`✅  [${num}/${issues.length}] #${body.number} created — ${issue.title}`);
-        created++;
-      } else {
-        console.error(`❌  [${num}/${issues.length}] HTTP ${status} — ${issue.title}`);
-        console.error(`    ${JSON.stringify(body)}`);
-        failed++;
-      }
-    } catch (err) {
-      console.error(`❌  [${num}/${issues.length}] ERROR — ${issue.title}`);
-      console.error(`    ${err.message}`);
-      failed++;
-    }
-
-    // Respect GitHub rate limits
-    if (i < issues.length - 1) {
-      await sleep(DELAY_MS);
-    }
+  if (existing.has(title)) {
+    console.log(`⏭️   [${num}/${issues.length}] SKIP — ${title}`);
+    skipped++;
+    continue;
   }
 
-  console.log(`\n─────────────────────────────────────────────────`);
-  console.log(`✅  Created : ${created}`);
-  console.log(`⏭️   Skipped : ${skipped} (already existed)`);
-  if (failed > 0) console.log(`❌  Failed  : ${failed}`);
-  console.log(`🔗  View    : https://github.com/${REPO_OWNER}/${REPO_NAME}/issues`);
-  console.log(`─────────────────────────────────────────────────\n`);
+  // Write body to a temp file to avoid shell escaping issues
+  const tmpFile = path.join(__dirname, '_tmp_body.md');
+  fs.writeFileSync(tmpFile, body, 'utf8');
+
+  try {
+    const labelFlag = labels.map(l => `--label "${l}"`).join(' ');
+    execSync(
+      `gh issue create --repo ${REPO} --title "${title.replace(/"/g, '\\"')}" --body-file "${tmpFile}" ${labelFlag}`,
+      { stdio: 'pipe' }
+    );
+    console.log(`✅  [${num}/${issues.length}] CREATED — ${title}`);
+    created++;
+  } catch (err) {
+    console.error(`❌  [${num}/${issues.length}] FAILED  — ${title}`);
+    console.error(`    ${err.stderr?.toString().trim() || err.message}`);
+    failed++;
+  }
+
+  // Clean up temp file
+  if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile);
 }
 
-main().catch(err => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+console.log(`\n─────────────────────────────────────────────────`);
+console.log(`✅  Created : ${created}`);
+console.log(`⏭️   Skipped : ${skipped}`);
+if (failed > 0) console.log(`❌  Failed  : ${failed}`);
+console.log(`🔗  View    : https://github.com/${REPO}/issues`);
+console.log(`─────────────────────────────────────────────────\n`);
